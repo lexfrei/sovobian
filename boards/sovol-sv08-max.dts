@@ -1,0 +1,43 @@
+/dts-v1/;
+/plugin/;
+
+/*
+ * Sovol SV08 Max on the Armbian BigTreeTech CB1 board profile.
+ *
+ * Differences vs the BTT CB1 device tree, taken from the vendor image:
+ *   - eMMC (mmc2) clock capped at the vendor-validated 40 MHz
+ *     (the Armbian CB1 dtb runs it at 150 MHz);
+ *   - uart4 on PI13/PI14 enabled (toolboard port).
+ *
+ * PI13/PI14 mux to uart4 per the mainline sun50i-h616 pinctrl driver.
+ */
+
+/ {
+	compatible = "bigtreetech,cb1", "allwinner,sun50i-h616";
+
+	fragment@0 {
+		target-path = "/soc/mmc@4022000";
+		__overlay__ {
+			max-frequency = <40000000>;
+		};
+	};
+
+	fragment@1 {
+		target-path = "/soc/pinctrl@300b000";
+		__overlay__ {
+			uart4_pi_pins: uart4-pi-pins {
+				pins = "PI13", "PI14";
+				function = "uart4";
+			};
+		};
+	};
+
+	fragment@2 {
+		target-path = "/soc/serial@5001000";
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <&uart4_pi_pins>;
+			status = "okay";
+		};
+	};
+};

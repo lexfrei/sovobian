@@ -1,0 +1,22 @@
+/dts-v1/;
+/plugin/;
+
+/*
+ * Sovol Zero on the Armbian BigTreeTech CB1 board profile.
+ *
+ * The only difference between the vendor device tree and the BTT CB1 one
+ * is the eMMC (mmc2) clock: Sovol validates it at 40 MHz, while the
+ * Armbian CB1 dtb runs it at 150 MHz, which the stock Sovol eMMC does
+ * not handle reliably.
+ */
+
+/ {
+	compatible = "bigtreetech,cb1", "allwinner,sun50i-h616";
+
+	fragment@0 {
+		target-path = "/soc/mmc@4022000";
+		__overlay__ {
+			max-frequency = <40000000>;
+		};
+	};
+};
