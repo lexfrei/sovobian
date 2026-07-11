@@ -16,6 +16,12 @@ The method and the per-board numbers are documented in [this gist](https://gist.
 
 The SV08 and SV08 Max overlays are derived from the vendor device trees in the official images but have not been verified on real machines yet. If you own one, please [open an issue](../../issues) with your results either way.
 
+## Known issue: kernel is held at 6.12 on purpose
+
+Armbian's `current` sunxi branch moved to kernel 6.18, and on H616/CB1-family boards 6.18 intermittently fails to initialise the SDIO wifi at boot (`mmc1: error -110`; the slot is `non-removable`, so a failed probe is terminal for that boot — observed on ~2/3 of boots). Details and logs: [armbian/build#10164](https://github.com/armbian/build/issues/10164).
+
+Until that is resolved, Sovobian stays on the last known-good base (Armbian 26.2.1, kernel 6.12.68), and the images ship with the kernel packages apt-pinned (`/etc/apt/preferences.d/sovobian-kernel-hold`) so a routine `apt upgrade` cannot pull the regression in. Everything else upgrades normally. Once the issue is fixed upstream, remove that file to unpin the kernel.
+
 ## Download and flash
 
 1. Grab the image for your board from [Releases](../../releases) and verify it against `SHA256SUMS`.
