@@ -1,0 +1,23 @@
+name: Verify upstream image
+
+on:
+  pull_request:
+    paths:
+      - ARMBIAN_VERSION
+      - scripts/resolve-image.sh
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Check that a minimal image exists for the pinned version
+        run: |
+          version="$(tr --delete '[:space:]' < ARMBIAN_VERSION)"
+          file="$(scripts/resolve-image.sh "$version")"
+          echo "resolved: $file"

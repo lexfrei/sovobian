@@ -1,0 +1,131 @@
+name: Build images
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ARMBIAN_VERSION
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Overwrite release assets if the release already exists"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Resolve upstream image
+        id: upstream
+        run: |
+          version="$(tr --delete '[:space:]' < ARMBIAN_VERSION)"
+          file="$(scripts/resolve-image.sh "$version")"
+          {
+            echo "version=$version"
+            echo "file=$file"
+            echo "url=https://dl.armbian.com/bigtreetech-cb1/archive/$file"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check for existing release
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.upstream.outputs.version }}
+          FORCE: ${{ inputs.force || 'false' }}
+        run: |
+          if gh release view "v$VERSION" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            exists=true
+          else
+            exists=false
+          fi
+          if [ "$exists" = "true" ] && [ "$FORCE" != "true" ]; then
+            proceed=false
+          else
+            proceed=true
+          fi
+          {
+            echo "exists=$exists"
+            echo "proceed=$proceed"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        if: steps.gate.outputs.proceed == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install --assume-yes device-tree-compiler
+
+      - name: Download and verify upstream image
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          URL: ${{ steps.upstream.outputs.url }}
+          FILE: ${{ steps.upstream.outputs.file }}
+        run: |
+          curl --location --fail --output "$FILE" "$URL"
+          curl --location --fail --output "$FILE.sha" "$URL.sha"
+          expected="$(cut --delimiter=' ' --fields=1 "$FILE.sha")"
+          actual="$(sha256sum "$FILE" | cut --delimiter=' ' --fields=1)"
+          if [ "$expected" != "$actual" ]; then
+            echo "checksum mismatch: expected $expected, got $actual" >&2
+            exit 1
+          fi
+          unxz "$FILE"
+
+      - name: Repack per-board images
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          FILE: ${{ steps.upstream.outputs.file }}
+        run: |
+          base_img="${FILE%.xz}"
+          mkdir out
+          for board in sovol-zero sovol-sv08 sovol-sv08-max; do
+            case "$board" in
+              sovol-zero) pretty="Sovol-Zero" ;;
+              sovol-sv08) pretty="Sovol-SV08" ;;
+              sovol-sv08-max) pretty="Sovol-SV08-Max" ;;
+            esac
+            out_name="${base_img/Armbian_/Sovobian_}"
+            out_name="${out_name/Bigtreetech-cb1/$pretty}"
+            sudo scripts/repack.sh "$base_img" "boards/$board.dts" "out/$out_name"
+            xz --threads=0 "out/$out_name"
+          done
+          cd out
+          sha256sum -- *.img.xz > SHA256SUMS
+
+      - name: Create release
+        if: steps.gate.outputs.proceed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.upstream.outputs.version }}
+          UPSTREAM_FILE: ${{ steps.upstream.outputs.file }}
+          EXISTS: ${{ steps.gate.outputs.exists }}
+        run: |
+          tag="v$VERSION"
+          cat > notes.md << EOF
+          Prebuilt Armbian-based images for Sovol H616 printer hosts, repacked from upstream \`$UPSTREAM_FILE\` with the vendor-validated eMMC clock overlay preinstalled.
+
+          | Board | eMMC clock | Extra | Status |
+          | --- | --- | --- | --- |
+          | Sovol Zero | 40 MHz | — | verified on hardware |
+          | Sovol SV08 | 45 MHz | uart3 (toolboard) enabled | **untested** — reports welcome |
+          | Sovol SV08 Max | 40 MHz | uart4 (toolboard) enabled | **untested** — reports welcome |
+
+          Flash to a microSD card, boot, then optionally run \`armbian-install\` to move the system to eMMC. See the README for details.
+
+          Sovobian is a community project and is not affiliated with Armbian, Sovol, or BigTreeTech.
+          EOF
+          if [ "$EXISTS" = "true" ]; then
+            gh release upload "$tag" out/* --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$tag" out/* \
+              --title "Sovobian $VERSION" \
+              --notes-file notes.md \
+              --repo "$GITHUB_REPOSITORY"
+          fi
