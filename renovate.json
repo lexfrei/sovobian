@@ -1,6 +1,8 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:recommended"
+  ],
   "customDatasources": {
     "armbian-cb1": {
       "defaultRegistryUrlTemplate": "https://dl.armbian.com/bigtreetech-cb1/archive/",
@@ -10,18 +12,25 @@
   "customManagers": [
     {
       "customType": "regex",
-      "managerFilePatterns": ["/^ARMBIAN_VERSION$/"],
-      "matchStrings": ["^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"],
+      "managerFilePatterns": [
+        "/^ARMBIAN_VERSION$/"
+      ],
+      "matchStrings": [
+        "^(?<currentValue>\\d+\\.\\d+\\.\\d+)\\s*$"
+      ],
       "depNameTemplate": "armbian-cb1-minimal",
       "datasourceTemplate": "custom.armbian-cb1"
     }
   ],
   "packageRules": [
     {
-      "matchDatasources": ["custom.armbian-cb1"],
+      "matchDatasources": [
+        "custom.armbian-cb1"
+      ],
       "extractVersion": "Armbian_(?<version>\\d+\\.\\d+\\.\\d+)_Bigtreetech-cb1_[a-z]+_current_[0-9.]+_minimal\\.img\\.xz$",
       "automerge": true,
-      "platformAutomerge": false
+      "platformAutomerge": false,
+      "allowedVersions": "<26.3.0"
     }
   ]
 }
