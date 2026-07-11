@@ -92,5 +92,12 @@ else
     echo "user_overlays=$overlay_name" >> "$env_file"
 fi
 
+# Hand the image back to the invoking user: a root-owned output makes
+# unprivileged post-processing fail (xz preserves file metadata onto the
+# compressed copy and treats a failed chgrp as exit code 2).
+if [ -n "${SUDO_UID:-}" ] && [ -n "${SUDO_GID:-}" ]; then
+    chown "$SUDO_UID:$SUDO_GID" "$output_img"
+fi
+
 sync
 echo "repacked: $output_img (overlay=$overlay_name, fdtfile=$FDTFILE)"
