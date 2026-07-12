@@ -29,8 +29,7 @@
       ],
       "extractVersion": "Armbian_(?<version>\\d+\\.\\d+\\.\\d+)_Bigtreetech-cb1_[a-z]+_current_[0-9.]+_minimal\\.img\\.xz$",
       "automerge": true,
-      "platformAutomerge": false,
-      "allowedVersions": "<26.3.0"
+      "platformAutomerge": false
     }
   ]
 }

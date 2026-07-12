@@ -92,44 +92,6 @@ else
     echo "user_overlays=$overlay_name" >> "$env_file"
 fi
 
-# Pin the kernel packages inside the image to the 26.2.x (6.12) line:
-# sunxi-6.18 intermittently fails to initialise the SDIO wifi on
-# H616/CB1-family boards (mmc error -110, no rescan for non-removable
-# slots), so an unsuspecting `apt upgrade` would break wifi on most boots.
-# https://github.com/armbian/build/issues/10164
-rootdir=""
-rootmnt="$workdir/rootmnt"
-mkdir "$rootmnt"
-for part in "$loopdev"p*; do
-    if mountpoint --quiet "$mnt" && [ "$(findmnt --noheadings --output SOURCE "$mnt")" = "$part" ]; then
-        continue
-    fi
-    if mount "$part" "$rootmnt" 2> /dev/null; then
-        if [ -d "$rootmnt/etc/apt" ]; then
-            rootdir="$rootmnt"
-            break
-        fi
-        umount "$rootmnt"
-    fi
-done
-
-if [ -n "$rootdir" ]; then
-    mkdir --parents "$rootdir/etc/apt/preferences.d"
-    cat > "$rootdir/etc/apt/preferences.d/sovobian-kernel-hold" << 'PINEOF'
-# Kernel held on the 6.12 (Armbian 26.2.x) line: sunxi-6.18 intermittently
-# fails to initialise the SDIO wifi on H616/CB1-family boards (error -110).
-# https://github.com/armbian/build/issues/10164
-# Remove this file to allow kernel upgrades once the issue is resolved.
-Package: linux-image-current-sunxi64 linux-dtb-current-sunxi64 linux-headers-current-sunxi64
-Pin: version 26.2.*
-Pin-Priority: 1001
-PINEOF
-    umount "$rootmnt"
-    echo "kernel hold installed in rootfs"
-else
-    echo "warning: rootfs with /etc/apt not found, kernel hold NOT installed" >&2
-fi
-
 # Hand the image back to the invoking user: a root-owned output makes
 # unprivileged post-processing fail (xz preserves file metadata onto the
 # compressed copy and treats a failed chgrp as exit code 2).
